@@ -5,17 +5,18 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // ── Category visual config ──────────────────────────────────────
-// Each category gets a shape (via geometry) and a color for instanced rendering.
+// Each category gets a shape, color, and base model dimensions (meters) for instanced rendering.
+// baseH = typical model height at scale 1.0, baseW = typical model width at scale 1.0
 const CATEGORY_CONFIG = {
-  tree:           { color: '#1a5c1a', shape: 'cone',     scaleY: 3.0, scaleXZ: 0.8, label: '🌲 Trees' },
-  bush:           { color: '#3a7a2a', shape: 'sphere',   scaleY: 0.6, scaleXZ: 0.8, label: '🌿 Bushes' },
-  building:       { color: '#8a6a4a', shape: 'box',      scaleY: 2.5, scaleXZ: 2.0, label: '🏠 Buildings' },
-  rock:           { color: '#7a7a7a', shape: 'dodeca',   scaleY: 1.0, scaleXZ: 1.2, label: '🪨 Rocks' },
-  wall:           { color: '#9a8a6a', shape: 'box',      scaleY: 1.5, scaleXZ: 0.3, label: '🧱 Walls' },
-  vehicle:        { color: '#cc4444', shape: 'box',      scaleY: 0.8, scaleXZ: 1.0, label: '🚗 Vehicles' },
-  infrastructure: { color: '#6a6a8a', shape: 'cylinder', scaleY: 3.0, scaleXZ: 0.15, label: '🏗️ Infrastructure' },
-  road:           { color: '#5a5a5a', shape: 'box',      scaleY: 0.1, scaleXZ: 2.0, label: '🛤️ Roads' },
-  other:          { color: '#aa8855', shape: 'box',      scaleY: 1.0, scaleXZ: 0.5, label: '📦 Other' },
+  tree:           { color: '#1a5c1a', shape: 'cone',     baseH: 8.0,  baseW: 3.0,  label: '🌲 Trees' },
+  bush:           { color: '#3a7a2a', shape: 'sphere',   baseH: 1.5,  baseW: 2.0,  label: '🌿 Bushes' },
+  building:       { color: '#8a6a4a', shape: 'box',      baseH: 5.0,  baseW: 8.0,  label: '🏠 Buildings' },
+  rock:           { color: '#7a7a7a', shape: 'dodeca',   baseH: 2.0,  baseW: 2.5,  label: '🪨 Rocks' },
+  wall:           { color: '#9a8a6a', shape: 'box',      baseH: 2.5,  baseW: 6.0,  label: '🧱 Walls' },
+  vehicle:        { color: '#cc4444', shape: 'box',      baseH: 1.8,  baseW: 4.0,  label: '🚗 Vehicles' },
+  infrastructure: { color: '#6a6a8a', shape: 'cylinder', baseH: 8.0,  baseW: 0.5,  label: '🏗️ Infrastructure' },
+  road:           { color: '#5a5a5a', shape: 'box',      baseH: 0.3,  baseW: 6.0,  label: '🛤️ Roads' },
+  other:          { color: '#aa8855', shape: 'box',      baseH: 2.0,  baseW: 2.0,  label: '📦 Other' },
 };
 
 const WORLD_HALF = 8192;
@@ -333,13 +334,12 @@ function TreeLayer({ verticalScale, worldScale, treeStride = 4 }) {
     return new THREE.ShaderMaterial({
       uniforms: {
         uMap: { value: farSprite },
-        uSize: { value: 0.85 },
         uFadeStart: { value: 35.0 },  // start fading at this distance
         uFadeEnd: { value: 50.0 },    // fully visible beyond this distance
         uColor: { value: new THREE.Color('#8fcf86') },
       },
       vertexShader: `
-        uniform float uSize;
+        attribute float aSize;
         uniform float uFadeStart;
         uniform float uFadeEnd;
         varying float vAlpha;
@@ -348,7 +348,7 @@ function TreeLayer({ verticalScale, worldScale, treeStride = 4 }) {
           float dist = -mvPos.z;
           // Fade: 0 when close (< uFadeStart), 1 when far (> uFadeEnd)
           vAlpha = clamp((dist - uFadeStart) / (uFadeEnd - uFadeStart), 0.0, 1.0);
-          gl_PointSize = uSize * (300.0 / -mvPos.z);
+          gl_PointSize = aSize * (300.0 / -mvPos.z);
           gl_Position = projectionMatrix * mvPos;
         }
       `,
@@ -372,16 +372,20 @@ function TreeLayer({ verticalScale, worldScale, treeStride = 4 }) {
     if (!data || count === 0) return null;
 
     const positions = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
       const idx = i * treeStride;
       positions[i * 3]     = (data[idx]     - WORLD_HALF) / worldScale;
       positions[i * 3 + 1] = (data[idx + 1] * verticalScale) / worldScale + 0.25;
       positions[i * 3 + 2] = -(data[idx + 2] - WORLD_HALF) / worldScale;
+      // Size based on actual WRP scale (avg ~0.8, range 0.06–5.13)
+      sizes[i] = Math.min(data[idx + 5] * 0.35, 3.0);
     }
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
     return geo;
   }, [data, count, verticalScale, worldScale, treeStride]);
 
@@ -437,6 +441,13 @@ function TreeLayer({ verticalScale, worldScale, treeStride = 4 }) {
   });
 
   // Write instance matrices for both trunk and crown (same transforms)
+  // Tree model geometry is normalized to ~0.55 scene units tall.
+  // WRP scale * baseModelHeight gives real-world height in meters.
+  // Divide by worldScale to get scene units. Then divide by 0.55 (the normalized geo height)
+  // to get the multiplier for the geometry.
+  const TREE_BASE_HEIGHT = 8.0;  // meters at WRP scale=1.0
+  const NORM_GEO_HEIGHT = 0.55;  // what we normalized the GLB geometry to
+
   useEffect(() => {
     if (!data || nearIds.length === 0) return;
     if (!trunkRef.current || !crownRef.current) return;
@@ -455,14 +466,17 @@ function TreeLayer({ verticalScale, worldScale, treeStride = 4 }) {
       const wy = data[idx + 1];
       const wz = data[idx + 2];
       const yawRad = data[idx + 3] * deg2rad;
+      const objScaleX = data[idx + 4];
+      const objScaleY = data[idx + 5];
+      const objScaleZ = data[idx + 6];
 
       const x = (wx - WORLD_HALF) / worldScale;
       const y = (wy * verticalScale) / worldScale;
       const z = -(wz - WORLD_HALF) / worldScale;
 
-      const noise = ((i * 9301 + 49297) % 233280) / 233280;
-      const sy = 0.8 + noise * 0.5;
-      const sxz = 0.85 + noise * 0.3;
+      // Real-world size → scene units → geometry multiplier
+      const sy  = (TREE_BASE_HEIGHT * objScaleY) / worldScale / NORM_GEO_HEIGHT;
+      const sxz = (TREE_BASE_HEIGHT * Math.max(objScaleX, objScaleZ) * 0.4) / worldScale / NORM_GEO_HEIGHT;
 
       const cosY = Math.cos(yawRad);
       const sinY = Math.sin(yawRad);
@@ -521,6 +535,8 @@ function TreeLayer({ verticalScale, worldScale, treeStride = 4 }) {
 }
 
 // ── Single category instanced mesh ──────────────────────────────
+const STRIDE_GENERAL = 7; // [x, y, z, yaw, scaleX, scaleY, scaleZ]
+
 function CategoryLayer({ category, verticalScale, worldScale }) {
   const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
   const data = useCategoryData(category, true);
@@ -529,7 +545,7 @@ function CategoryLayer({ category, verticalScale, worldScale }) {
   const { geometry, material, count } = useMemo(() => {
     if (!data) return { geometry: null, material: null, count: 0 };
     
-    const n = data.length / 4; // each object = 4 floats
+    const n = Math.floor(data.length / STRIDE_GENERAL);
     const geo = getGeometry(config.shape);
     const mat = new THREE.MeshStandardMaterial({
       color: config.color,
@@ -541,40 +557,46 @@ function CategoryLayer({ category, verticalScale, worldScale }) {
     return { geometry: geo, material: mat, count: n };
   }, [data, config.shape, config.color]);
   
-  // Set instance matrices
+  // Set instance matrices using per-object scale from binary data
   useEffect(() => {
     if (!meshRef.current || !data || count === 0) return;
     
     const mesh = meshRef.current;
     const dummy = new THREE.Object3D();
-    const sx = config.scaleXZ;
-    const sy = config.scaleY;
+    // Base model dimensions (meters at scale 1.0)
+    const baseH = config.baseH;
+    const baseW = config.baseW;
     
     for (let i = 0; i < count; i++) {
-      const idx = i * 4;
-      const wx = data[idx];     // world X
-      const wy = data[idx + 1]; // world Y (elevation)
-      const wz = data[idx + 2]; // world Z
+      const idx = i * STRIDE_GENERAL;
+      const wx = data[idx];       // world X
+      const wy = data[idx + 1];   // world Y (elevation)
+      const wz = data[idx + 2];   // world Z
       const yawDeg = data[idx + 3];
+      const objScaleX = data[idx + 4]; // WRP transform scale
+      const objScaleY = data[idx + 5];
+      const objScaleZ = data[idx + 6];
       
-      // Convert world coords to Three.js scene coords
-      // In our scene: X range = [-worldSize/2, worldSize/2] (÷32 scale)
-      // WRP coords: X = 0..16384, Z = 0..16384
-      // Our terrain is centered at origin with size worldSize/32
+      // Convert world coords to scene coords
       const sceneX = (wx - 8192) / worldScale;
       const sceneY = (wy * verticalScale) / worldScale;
-      const sceneZ = -(wz - 8192) / worldScale; // Z is flipped
+      const sceneZ = -(wz - 8192) / worldScale;
+      
+      // Apply per-object scale: base model size × WRP transform scale ÷ worldScale
+      const sx = (baseW * objScaleX) / worldScale;
+      const sy = (baseH * objScaleY) / worldScale;
+      const sz = (baseW * objScaleZ) / worldScale;
       
       dummy.position.set(sceneX, sceneY, sceneZ);
       dummy.rotation.set(0, (yawDeg * Math.PI) / 180, 0);
-      dummy.scale.set(sx, sy, sx);
+      dummy.scale.set(sx, sy, sz);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }
     
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [data, count, verticalScale, worldScale, config.scaleXZ, config.scaleY]);
+  }, [data, count, verticalScale, worldScale, config.baseH, config.baseW]);
   
   if (!geometry || count === 0) return null;
   
@@ -591,7 +613,7 @@ function CategoryLayer({ category, verticalScale, worldScale }) {
 export default function Objects({ visibleCategories, verticalScale, objectsMeta }) {
   // worldScale = 32 (terrain is divided by this factor)
   const worldScale = 32;
-  const treeStride = objectsMeta?.categories?.tree?.stride || 4;
+  const treeStride = objectsMeta?.categories?.tree?.stride || 8;
   
   return (
     <group>

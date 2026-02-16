@@ -11,7 +11,7 @@ import FpsReporter from './FpsReporter';
 export default function App() {
   const [waterLevel, setWaterLevel] = useState(0);
   const [verticalScale, setVerticalScale] = useState(1.5);
-  const [colorMode, setColorMode] = useState('hypsometric');
+  const [colorMode, setColorMode] = useState('satellite');
   const [showWater, setShowWater] = useState(true);
   const [wireframe, setWireframe] = useState(false);
   const [resolution, setResolution] = useState(1024);

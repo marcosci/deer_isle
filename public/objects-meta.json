@@ -5,7 +5,7 @@
     "tree": {
       "count": 1352388,
       "file": "objects-tree.bin",
-      "stride": 5,
+      "stride": 8,
       "models": [
         "t_piceaabies_3s_summer.p3d",
         "t_pinussylvestris_3f_summer.p3d",
@@ -47,7 +47,7 @@
     "bush": {
       "count": 584607,
       "file": "objects-bush.bin",
-      "stride": 4,
+      "stride": 7,
       "models": [
         "b_sambucusnigra_2s_summer.p3d",
         "b_rosacanina_2s_summer.p3d",
@@ -80,7 +80,7 @@
     "building": {
       "count": 344404,
       "file": "objects-building.bin",
-      "stride": 4,
+      "stride": 7,
       "models": [
         "wall_indcnc3_1_4.p3d",
         "a_mosque_small_1_ep1.p3d",
@@ -117,7 +117,7 @@
     "rock": {
       "count": 81578,
       "file": "objects-rock.bin",
-      "stride": 4,
+      "stride": 7,
       "models": [
         "rock_bright_monolith1.p3d",
         "rock_wallh6.p3d",
@@ -154,7 +154,7 @@
     "other": {
       "count": 9515,
       "file": "objects-other.bin",
-      "stride": 4,
+      "stride": 7,
       "models": [
         "enoch_river_0.p3d",
         "jmc_lab_maindeck.p3d",
@@ -191,7 +191,7 @@
     "wall": {
       "count": 2382,
       "file": "objects-wall.bin",
-      "stride": 4,
+      "stride": 7,
       "models": [
         "jmc_lab_wallpipes.p3d",
         "jmc_lab_wallsupports.p3d",
@@ -228,7 +228,7 @@
     "infrastructure": {
       "count": 1395,
       "file": "objects-infrastructure.bin",
-      "stride": 4,
+      "stride": 7,
       "models": [
         "jmc_basement_bin.p3d",
         "jmc_basement_stairs.p3d",
@@ -265,7 +265,7 @@
     "vehicle": {
       "count": 76,
       "file": "objects-vehicle.bin",
-      "stride": 4,
+      "stride": 7,
       "models": [
         "bilboard_small_boatrental.p3d",
         "bilboard_big_stag1.p3d",
@@ -284,7 +284,7 @@
     "road": {
       "count": 56,
       "file": "objects-road.bin",
-      "stride": 4,
+      "stride": 7,
       "models": [
         "jmc_ice_snowy_bridge_wooden_step.p3d",
         "jmc_ice_crenbridgeend001.p3d",

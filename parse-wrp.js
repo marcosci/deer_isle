@@ -8,8 +8,9 @@
  *
  * Output:
  *   public/objects-meta.json      — category list, counts, metadata
- *   public/objects-<cat>.bin      — Float32Array [x, y, z, yaw, ...] per category
- *                                  tree category uses [x, y, z, yaw, speciesId]
+ *   public/objects-<cat>.bin      — Float32Array per category:
+ *                                  general: [x, y, z, yaw, scaleX, scaleY, scaleZ]  stride=7
+ *                                  tree:    [x, y, z, yaw, scaleX, scaleY, scaleZ, speciesId]  stride=8
  *
  * OPRW format based on: gruppe-adler/grad_aff (wrp.cpp / wrp.h)
  * Each Object record is 60 bytes:
@@ -218,8 +219,8 @@ function parseWRP(filePath) {
     r.u32(); // objectId — skip
     const modelIndex = r.u32();
     const m0 = r.xyz(); // right vector
-    r.xyz();            // up vector
-    r.xyz();            // forward vector
+    const m1 = r.xyz(); // up vector
+    const m2 = r.xyz(); // forward vector
     const pos = r.xyz(); // position (row 3)
     r.u32();            // static 0x02
 
@@ -232,6 +233,11 @@ function parseWRP(filePath) {
     categoryPositions[cat].push(pos[0], pos[1], pos[2]);
     // yaw from right vector
     categoryPositions[cat].push(Math.atan2(m0[0], m0[2]) * (180 / Math.PI));
+    // Extract scale from transform matrix column lengths
+    const scaleX = Math.sqrt(m0[0]*m0[0] + m0[1]*m0[1] + m0[2]*m0[2]);
+    const scaleY = Math.sqrt(m1[0]*m1[0] + m1[1]*m1[1] + m1[2]*m1[2]);
+    const scaleZ = Math.sqrt(m2[0]*m2[0] + m2[1]*m2[1] + m2[2]*m2[2]);
+    categoryPositions[cat].push(scaleX, scaleY, scaleZ);
     if (cat === 'tree') {
       categoryPositions[cat].push(classifyTreeSpecies(models[modelIndex]));
     }
@@ -278,7 +284,7 @@ function parseWRP(filePath) {
     meta.categories[cat] = {
       count: cnt,
       file: `objects-${cat}.bin`,
-      stride: cat === 'tree' ? 5 : 4,
+      stride: cat === 'tree' ? 8 : 7,
       models: [...uniqueModels].slice(0, 30),
     };
 
