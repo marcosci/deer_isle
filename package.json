@@ -1,0 +1,24 @@
+{
+  "name": "deerisle-terrain-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "convert": "node convert-asc.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@bis-toolkit/paa": "^1.0.2",
+    "@react-three/drei": "^9.114.0",
+    "@react-three/fiber": "^8.17.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sharp": "^0.34.5",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.0",
+    "vite": "^5.4.0"
+  }
+}

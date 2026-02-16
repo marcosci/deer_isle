@@ -1,0 +1,16 @@
+{
+  "resolutions": [
+    1024,
+    2048,
+    4096
+  ],
+  "originalWidth": 4096,
+  "originalHeight": 4096,
+  "cellSize": 4,
+  "worldSize": 16384,
+  "minElevation": -67.95,
+  "maxElevation": 706.52,
+  "nodata": -9999,
+  "xllcorner": 500000,
+  "yllcorner": 442127.375
+}
