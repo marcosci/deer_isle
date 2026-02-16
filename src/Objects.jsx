@@ -537,6 +537,88 @@ function TreeLayer({ verticalScale, worldScale, treeStride = 4 }) {
 // ── Single category instanced mesh ──────────────────────────────
 const STRIDE_GENERAL = 7; // [x, y, z, yaw, scaleX, scaleY, scaleZ]
 
+// ── Building footprints — flat outlines on the terrain surface ──
+function BuildingFootprintLayer({ verticalScale, worldScale }) {
+  const config = CATEGORY_CONFIG.building;
+  const data = useCategoryData('building', true);
+  const fillRef = useRef();
+  const outlineRef = useRef();
+
+  const count = useMemo(() => {
+    if (!data) return 0;
+    return Math.floor(data.length / STRIDE_GENERAL);
+  }, [data]);
+
+  const fillMat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#c4956a',
+    transparent: true,
+    opacity: 0.25,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  }), []);
+
+  const outlineMat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#e8a850',
+    transparent: true,
+    opacity: 0.7,
+    wireframe: true,
+    depthWrite: false,
+  }), []);
+
+  const footprintGeo = useMemo(() => {
+    // Very thin box laid flat — acts as a filled rectangle + wireframe outline
+    const geo = new THREE.BoxGeometry(1, 0.01, 1);
+    return geo;
+  }, []);
+
+  useEffect(() => {
+    if (!fillRef.current || !outlineRef.current || !data || count === 0) return;
+
+    const fillMesh = fillRef.current;
+    const outlineMesh = outlineRef.current;
+    const dummy = new THREE.Object3D();
+    const baseW = config.baseW;
+
+    for (let i = 0; i < count; i++) {
+      const idx = i * STRIDE_GENERAL;
+      const wx = data[idx];
+      const wy = data[idx + 1];
+      const wz = data[idx + 2];
+      const yawDeg = data[idx + 3];
+      const objScaleX = data[idx + 4];
+      const objScaleZ = data[idx + 6];
+
+      const sceneX = (wx - 8192) / worldScale;
+      const sceneY = (wy * verticalScale) / worldScale + 0.04; // slightly above terrain
+      const sceneZ = -(wz - 8192) / worldScale;
+
+      const sx = (baseW * objScaleX) / worldScale;
+      const sz = (baseW * objScaleZ) / worldScale;
+
+      dummy.position.set(sceneX, sceneY, sceneZ);
+      dummy.rotation.set(0, (yawDeg * Math.PI) / 180, 0);
+      dummy.scale.set(sx, 1, sz);
+      dummy.updateMatrix();
+      fillMesh.setMatrixAt(i, dummy.matrix);
+      outlineMesh.setMatrixAt(i, dummy.matrix);
+    }
+
+    fillMesh.instanceMatrix.needsUpdate = true;
+    outlineMesh.instanceMatrix.needsUpdate = true;
+    fillMesh.computeBoundingSphere();
+    outlineMesh.computeBoundingSphere();
+  }, [data, count, verticalScale, worldScale, config.baseW]);
+
+  if (count === 0) return null;
+
+  return (
+    <group>
+      <instancedMesh ref={fillRef} args={[footprintGeo, fillMat, count]} frustumCulled={false} renderOrder={1} />
+      <instancedMesh ref={outlineRef} args={[footprintGeo, outlineMat, count]} frustumCulled={false} renderOrder={2} />
+    </group>
+  );
+}
+
 function CategoryLayer({ category, verticalScale, worldScale }) {
   const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
   const data = useCategoryData(category, true);
@@ -621,8 +703,12 @@ export default function Objects({ visibleCategories, verticalScale, objectsMeta 
         <TreeLayer verticalScale={verticalScale} worldScale={worldScale} treeStride={treeStride} />
       )}
 
+      {visibleCategories.building && (
+        <BuildingFootprintLayer verticalScale={verticalScale} worldScale={worldScale} />
+      )}
+
       {Object.entries(visibleCategories).map(([cat, visible]) => (
-        visible && cat !== 'tree' && CATEGORY_CONFIG[cat] ? (
+        visible && cat !== 'tree' && cat !== 'building' && CATEGORY_CONFIG[cat] ? (
           <CategoryLayer
             key={cat}
             category={cat}

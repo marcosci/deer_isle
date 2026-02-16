@@ -87,6 +87,7 @@ export default function HUD({
   objectsMeta,
   showLabels, setShowLabels,
   fps,
+  onScreenshot,
 }) {
   const [objectsExpanded, setObjectsExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -310,6 +311,33 @@ export default function HUD({
             })}
           </div>
         )}
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: '1px solid rgba(100,140,200,0.15)', paddingTop: 10 }}>
+        <button
+          onClick={onScreenshot}
+          style={{
+            width: '100%',
+            padding: '8px 0',
+            background: 'rgba(68, 136, 204, 0.25)',
+            color: '#c8ddf0',
+            border: '1px solid rgba(100, 160, 220, 0.4)',
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(68, 136, 204, 0.45)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(68, 136, 204, 0.25)'}
+          title="Save current view as PNG"
+        >
+          📸 Screenshot
+        </button>
       </div>
 
       <div style={{ marginTop: 12, borderTop: '1px solid rgba(100,140,200,0.15)', paddingTop: 10 }}>

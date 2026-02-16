@@ -225,6 +225,10 @@ export default function Terrain({ waterLevel, verticalScale, colorMode, showWate
     if (sunRef.current) {
       sunRef.current.position.set(sunPos[0], sunPos[1], sunPos[2]);
     }
+    // Keep underwater tint uniform in sync with water level
+    if (meshRef.current?.userData?.shader) {
+      meshRef.current.userData.shader.uniforms.uWaterY.value = (waterLevel * verticalScale) / 32;
+    }
   });
 
   // All hooks called — safe to bail out now
@@ -250,6 +254,47 @@ export default function Terrain({ waterLevel, verticalScale, colorMode, showWate
             roughness={0.92}
             metalness={0.0}
             flatShading={false}
+            onBeforeCompile={(shader) => {
+              shader.uniforms.uWaterY = { value: (waterLevel * verticalScale) / 32 };
+              // Inject uniform declaration
+              shader.fragmentShader = shader.fragmentShader.replace(
+                'void main() {',
+                `uniform float uWaterY;\nvoid main() {`
+              );
+              // After map_fragment (where diffuseColor has the satellite texture),
+              // tint pixels below water level with a depth-dependent blue-green
+              shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <map_fragment>',
+                `#include <map_fragment>
+{
+  // vWorldPosition.y is in scene units (world elevation * vScale / 32)
+  float depth = uWaterY - vWorldPosition.y;
+  if (depth > 0.0) {
+    float t = clamp(depth / 4.0, 0.0, 1.0); // 0→1 over ~128m world depth
+    vec3 shallowTint = vec3(0.25, 0.55, 0.65);
+    vec3 deepTint    = vec3(0.08, 0.18, 0.30);
+    vec3 waterColor  = mix(shallowTint, deepTint, t);
+    diffuseColor.rgb = mix(diffuseColor.rgb, waterColor, 0.45 + 0.45 * t);
+  }
+}`
+              );
+              // We need vWorldPosition in the fragment shader
+              shader.vertexShader = shader.vertexShader.replace(
+                'void main() {',
+                `varying vec3 vWorldPosition;\nvoid main() {`
+              );
+              shader.vertexShader = shader.vertexShader.replace(
+                '#include <worldpos_vertex>',
+                `#include <worldpos_vertex>
+vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+              );
+              shader.fragmentShader = shader.fragmentShader.replace(
+                'void main() {',
+                `varying vec3 vWorldPosition;\nvoid main() {`
+              );
+              // Store ref so we can update waterY uniform each frame
+              meshRef.current.userData.shader = shader;
+            }}
           />
         ) : (
           <meshStandardMaterial

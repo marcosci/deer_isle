@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import Terrain from './Terrain';
@@ -22,6 +22,22 @@ export default function App() {
   const [objectsMeta, setObjectsMeta] = useState(null);
   const [fps, setFps] = useState(0);
 
+  const handleScreenshot = useCallback(() => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
+    // For WebGL canvases we need to re-render with preserveDrawingBuffer
+    // But toDataURL still works if called right after a frame
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `deerisle-${Date.now()}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }, []);
+
   // Load objects metadata on mount
   useEffect(() => {
     fetch('/objects-meta.json')
@@ -42,7 +58,7 @@ export default function App() {
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
         camera={{ position: [400, 300, 400], fov: 50, near: 1, far: 5000 }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, preserveDrawingBuffer: true }}
         dpr={[1, 2]}
       >
         <color attach="background" args={['#0a0a1a']} />
@@ -98,6 +114,7 @@ export default function App() {
         showLabels={showLabels}
         setShowLabels={setShowLabels}
         fps={fps}
+        onScreenshot={handleScreenshot}
       />
     </div>
   );
